@@ -34,7 +34,7 @@ async def create_relationship(relationship_type: str, file: UploadFile = File(..
 
         with driver.session() as session:
             # Construct the correct file URL for Neo4j LOAD CSV
-            remote_csv_url = f"file://{SSH_DESTINATION_PATH}/{local_csv_file}"
+            remote_csv_url = f"file://dd1/{local_csv_file}"
             # Create relationships using apoc.periodic.iterate
             query = f"""
             CALL apoc.periodic.iterate(

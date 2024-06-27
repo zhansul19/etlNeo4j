@@ -1,4 +1,5 @@
 from fastapi import FastAPI, APIRouter, File, UploadFile, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from neo4j import GraphDatabase
 import logging
@@ -9,6 +10,18 @@ from property import router as relation_router
 app = FastAPI()
 app.include_router(property_router)
 app.include_router(relation_router)
+
+origins = [
+    "*",
+]
+# Add CORS middleware to allow requests from specified origins
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["Authorization", "Content-Type"],
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -60,7 +73,7 @@ async def create_node(label: str, file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@app.post("/h/")
+@app.get("/h/")
 async def hello():
     return "hello"
 
