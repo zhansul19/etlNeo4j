@@ -28,7 +28,8 @@ def transfer_file_via_scp(file_contents: bytes, filename: str):
 
         # Transfer file via SCP
         scp = ssh.open_sftp()
-        scp.putfo(file_obj, f"{SSH_DESTINATION_PATH}/{filename}")
+        print(f"{SSH_DESTINATION_PATH}/{filename}")
+        scp.putfo(file_obj, f"{SSH_DESTINATION_PATH}{filename}")
         scp.close()
 
         # Close SSH connection

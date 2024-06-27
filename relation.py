@@ -34,7 +34,7 @@ async def create_relationship(relationship_type: str, file: UploadFile = File(..
 
         with driver.session() as session:
             # Construct the correct file URL for Neo4j LOAD CSV
-            remote_csv_url = f"file://dd1/{local_csv_file}"
+            remote_csv_url = f"file:///dd1/{local_csv_file}"
             # Create relationships using apoc.periodic.iterate
             query = f"""
             CALL apoc.periodic.iterate(
@@ -70,7 +70,7 @@ async def create_relationship(relationship_type: str, file: UploadFile = File(..
 
         with driver.session() as session:
             # Construct the correct file URL for Neo4j LOAD CSV
-            remote_csv_url = f"file://{SSH_DESTINATION_PATH}/{local_csv_file}"
+            remote_csv_url = f"file:///dd1/{local_csv_file}"
             # Create relationships using apoc.periodic.iterate
             query = f"""
             CALL apoc.periodic.iterate(
@@ -106,7 +106,7 @@ async def create_relationship(relationship_type: str, file: UploadFile = File(..
 
         with driver.session() as session:
             # Construct the correct file URL for Neo4j LOAD CSV
-            remote_csv_url = f"file://{SSH_DESTINATION_PATH}/{local_csv_file}"
+            remote_csv_url = f"file:///dd1/{local_csv_file}"
             # Create relationships using apoc.periodic.iterate
             query = f"""
             CALL apoc.periodic.iterate(
@@ -141,12 +141,12 @@ async def create_relationship(relationship_type: str, file: UploadFile = File(..
 
         with driver.session() as session:
             # Construct the correct file URL for Neo4j LOAD CSV
-            remote_csv_url = f"file://{SSH_DESTINATION_PATH}/{local_csv_file}"
+            remote_csv_url = f"file:///dd1/{local_csv_file}"
             # Create relationships using apoc.periodic.iterate
             query = f"""
             CALL apoc.periodic.iterate(
-          
-          
+                "LOAD CSV WITH HEADERS FROM '{remote_csv_url}' AS row FIELDTERMINATOR ',' RETURN row",
+                "MATCH (a:Company {{`БИН`: row.IIN_1}}), (b:Person {{`ИИН`: row.IIN_2}})  
                CREATE (a)-[r:{relationship_type}]->(b)
                SET r += apoc.map.removeKeys(row, ['IIN_1', 'IIN_2'])",
               {{batchSize: 1000, iterateList: true}})
