@@ -47,28 +47,8 @@ async def add_property(file: UploadFile = File(...)):
             summary = result.consume()
             stats = summary.counters
 
-            # Log the query statistics
-            logging.info(f"Query statistics: {stats}")
 
-            # Extract the individual statistics
-            details = {
-                "nodes_created": stats.nodes_created,
-                "nodes_deleted": stats.nodes_deleted,
-                "relationships_created": stats.relationships_created,
-                "relationships_deleted": stats.relationships_deleted,
-                "properties_set": stats.properties_set,
-                "labels_added": stats.labels_added,
-                "labels_removed": stats.labels_removed
-            }
-
-            # Check if properties were set
-            if stats.properties_set == 0:
-                return JSONResponse(content={
-                    "message": "No properties were set, check your data and relationships",
-                    "details": details
-                }, status_code=400)
-
-        return JSONResponse(content={"message": "Relationships created successfully", "details": details},
+        return JSONResponse(content={"message": "Relationships created successfully"},
                             status_code=200)
     except Exception as e:
         logging.error(f"Error in /create_relationship Person/: {str(e)}")
@@ -104,28 +84,8 @@ async def add_property(file: UploadFile = File(...)):
             summary = result.consume()
             stats = summary.counters
 
-            # Log the query statistics
-            logging.info(f"Query statistics: {stats}")
 
-            # Extract the individual statistics
-            details = {
-                "nodes_created": stats.nodes_created,
-                "nodes_deleted": stats.nodes_deleted,
-                "relationships_created": stats.relationships_created,
-                "relationships_deleted": stats.relationships_deleted,
-                "properties_set": stats.properties_set,
-                "labels_added": stats.labels_added,
-                "labels_removed": stats.labels_removed
-            }
-
-            # Check if properties were set
-            if stats.properties_set == 0:
-                return JSONResponse(content={
-                    "message": "No properties were set, check your data and relationships",
-                    "details": details
-                }, status_code=400)
-
-        return JSONResponse(content={"message": "Relationships created successfully", "details": details},
+        return JSONResponse(content={"message": "Relationships created successfully"},
                             status_code=200)
     except Exception as e:
         logging.error(f"Error in /create_relationship company/: {str(e)}")
