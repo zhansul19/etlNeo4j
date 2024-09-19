@@ -6,10 +6,12 @@ import logging
 from ssh import transfer_file_via_scp
 from relation import router as property_router
 from property import router as relation_router
+from bank import router as bank_router
 
 app = FastAPI()
 app.include_router(property_router)
 app.include_router(relation_router)
+app.include_router(bank_router)
 
 origins = [
     "*",
