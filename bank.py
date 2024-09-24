@@ -11,7 +11,7 @@ def create_neo4j_driver():
     # Replace with actual connection details
     uri = "bolt://192.168.122.104:7687/"
     username = "neo4j"
-    password = "afdpar"
+    password = "afmdpar"
     return GraphDatabase.driver(uri, auth=(username, password))
 
 # Assuming pandas DataFrame is passed as a file upload in FastAPI
