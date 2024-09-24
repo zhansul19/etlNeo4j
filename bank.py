@@ -9,66 +9,45 @@ router = APIRouter()
 # Assuming you have a function to create the Neo4j driver
 def create_neo4j_driver():
     # Replace with actual connection details
-    uri = "bolt://192.168.122.104:7687"
+    uri = "bolt://localhost:7689/"
     username = "neo4j"
-    password = "afmdpar"
+    password = "password"
     return GraphDatabase.driver(uri, auth=(username, password))
 
 # Assuming pandas DataFrame is passed as a file upload in FastAPI
-@router.post("/insert_data_kaspi/")
-async def insert_data_kaspi(file: UploadFile = File(...)):
-    driver = create_neo4j_driver()
-    contents = await file.read()
-    df = pd.read_excel(contents, engine='openpyxl', skiprows=10)
-    df.dropna(how='all', inplace=True)
-    try:
-        with driver.session() as session:
-            for index, row in df.iterrows():
-                iin1 = determine_type(row['ИИН/БИН плательщика'])
-                iin2 = determine_type(row['ИИН/БИН получателя'])
-                query = f"""
-                MERGE (p1:{iin1} {{iin: $sender_bin}})
-                MERGE (p2:{iin2} {{iin: $receiver_bin}})
-                MERGE (p1)-[t:TransactionKaspi]-(p2)
-                ON CREATE SET t.`Дата и время операции` = $date_time,
-                              t.`Валюта операции` = $currency,
-                              t.`Виды операции (категория документа)` = $operation_type,
-                              t.`Сумма` = $amount,
-                              t.`Наименование/ФИО плательщика` = $sender_name,
-                              t.`ИИН/БИН плательщика` = $sender_bin,
-                              t.`Резидентство плательщика` = $sender_residence,
-                              t.`Банк плательщика` = $sender_bank,
-                              t.`Номер счета плательщика` = $sender_account,
-                              t.`Наименование/ФИО получателя` = $receiver_name,
-                              t.`ИИН/БИН получателя` = $receiver_bin,
-                              t.`Резидентство получателя` = $receiver_residence,
-                              t.`Банк получателя` = $receiver_bank,
-                              t.`Номер счета получателя` = $receiver_account,
-                              t.`Код назначения платежа` = $payment_code,
-                              t.`Назначение платежа` = $payment_description
-                """
-                session.run(query,
-                            date_time=row['Дата и время операции'],
-                            currency=row['Валюта операции'],
-                            operation_type=row['Виды операции (категория документа)'],
-                            amount=row['Сумма'],
-                            sender_name=row['Наименование/ФИО плательщика'],
-                            sender_bin=row['ИИН/БИН плательщика'],
-                            sender_residence=row['Резидентство плательщика'],
-                            sender_bank=row['Банк плательщика'],
-                            sender_account=row['Номер счета плательщика'],
-                            receiver_name=row['Наименование/ФИО получателя'],
-                            receiver_bin=row['ИИН/БИН получателя'],
-                            receiver_residence=row['Резидентство получателя'],
-                            receiver_bank=row['Банк получателя'],
-                            receiver_account=row['Номер счета получателя'],
-                            payment_code=row['Код назначения платежа'],
-                            payment_description=row['Назначение платежа'])
-                return {"status": "Data inserted for Kaspi"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        driver.close()
+expected_columns_kaspi = [
+    'Дата и время операции', 'Валюта операции', 'Виды операции (категория документа)',
+    'Сумма', 'Наименование/ФИО плательщика', 'ИИН/БИН плательщика',
+    'Резидентство плательщика', 'Банк плательщика', 'Номер счета плательщика',
+    'Наименование/ФИО получателя', 'ИИН/БИН получателя', 'Резидентство получателя',
+    'Банк получателя', 'Номер счета получателя', 'Код назначения платежа', 'Назначение платежа'
+]
+expected_columns_halyk = [
+    'Дата и время операции', 'Валюта операции', 'Виды операции (категория документа)',
+    'Наименование СДП (при наличии)', 'Сумма в валюте ее проведения по кредиту',
+    'Сумма в валюте ее проведения по дебету', 'Сумма в тенге',
+    'Наименование/ФИО плательщика', 'ИИН/БИН плательщика', 'Резидентство плательщика',
+    'Банк плательщика', 'Номер счета плательщика', 'Наименование/ФИО получателя',
+    'ИИН/БИН получателя', 'Резидентство получателя', 'Банк получателя',
+    'Номер счета получателя', 'Код назначения платежа', 'Назначение платежа'
+]
+expected_columns_home = [
+    'Дата и время операции', 'Валюта операции', 'Виды операции (категория документа)',
+    'Наименование СДП (при наличии)', 'Сумма в валюте ее проведения',
+    'Сумма в тенге', 'Наименование/ФИО плательщика', 'ИИН/БИН плательщика',
+    'Резидентство плательщика', 'Банк плательщика', 'Номер счета плательщика',
+    'Наименование/ФИО получателя', 'ИИН/БИН получателя', 'Резидентство получателя',
+    'Банк получателя', 'Номер счета получателя', 'Код назначения платежа',
+    'Назначение платежа'
+]
+expected_columns_vtb = [
+    'Дата и время операции', 'Валюта операции', 'Вид операции (КД)',
+    'Наименование СДП (при наличии)', 'Сумма (вал.)', 'Сумма (тенге)',
+    'Наименование/ФИО плательщика', 'ИИН/БИН плательщика', 'Резиденство плательщика',
+    'Банк плательщика', 'Номер счета плательщика', 'Наименование/ФИО получателя',
+    'ИИН/БИН получателя', 'Резиденство получателя', 'Банк получателя',
+    'Номер счета получателя', 'Код назначение платежа (КНП)', 'Назначение платежа'
+]
 
 def determine_type(iin):
     iin_str = str(iin)
@@ -79,6 +58,87 @@ def determine_type(iin):
             return "CompanyBank"
     else:
         return "rrrBank"
+# def check_columns_in_excel(file_path):
+#     df = pd.read_excel(file_path, engine='openpyxl', skiprows=10)
+#     first_row_columns = df.columns.tolist()
+#
+#     if all(column in first_row_columns for column in expected_columns):
+#         return True
+#     else:
+#         missing_columns = [col for col in expected_columns if col not in first_row_columns]
+#         print(f"Missing columns: {missing_columns}")
+#         return False
+# Helper function to check columns in Excel
+def check_columns(df_columns, expected_columns):
+    return all(column in df_columns for column in expected_columns)
+@router.post("/insert_data_kaspi/")
+async def insert_data_kaspi(file: UploadFile = File(...)):
+    contents = await file.read()
+    driver = create_neo4j_driver()
+
+    df = pd.read_excel(BytesIO(contents), engine='openpyxl', skiprows=10)
+    if not check_columns(df.columns, expected_columns_kaspi):
+        raise HTTPException(status_code=400, detail="Improper file format for Kaspi.")
+
+    df.dropna(how='all', inplace=True)
+
+    try:
+        with driver.session() as session:
+            for index, row in df.iterrows():
+                try:
+                    iin1 = determine_type(row['ИИН/БИН плательщика'])
+                    iin2 = determine_type(row['ИИН/БИН получателя'])
+
+                    query = f"""
+                       MERGE (p1:{iin1} {{iin: $sender_bin}})
+                       MERGE (p2:{iin2} {{iin: $receiver_bin}})
+                       MERGE (p1)-[t:TransactionKaspi]-(p2)
+                       ON CREATE SET t.`Дата и время операции` = $date_time,
+                                     t.`Валюта операции` = $currency,
+                                     t.`Виды операции (категория документа)` = $operation_type,
+                                     t.`Сумма` = $amount,
+                                     t.`Наименование/ФИО плательщика` = $sender_name,
+                                     t.`ИИН/БИН плательщика` = $sender_bin,
+                                     t.`Резидентство плательщика` = $sender_residence,
+                                     t.`Банк плательщика` = $sender_bank,
+                                     t.`Номер счета плательщика` = $sender_account,
+                                     t.`Наименование/ФИО получателя` = $receiver_name,
+                                     t.`ИИН/БИН получателя` = $receiver_bin,
+                                     t.`Резидентство получателя` = $receiver_residence,
+                                     t.`Банк получателя` = $receiver_bank,
+                                     t.`Номер счета получателя` = $receiver_account,
+                                     t.`Код назначения платежа` = $payment_code,
+                                     t.`Назначение платежа` = $payment_description
+                       """
+                    session.run(query,
+                                date_time=row['Дата и время операции'],
+                                currency=row['Валюта операции'],
+                                operation_type=row['Виды операции (категория документа)'],
+                                amount=row['Сумма'],
+                                sender_name=row['Наименование/ФИО плательщика'],
+                                sender_bin=row['ИИН/БИН плательщика'],
+                                sender_residence=row['Резидентство плательщика'],
+                                sender_bank=row['Банк плательщика'],
+                                sender_account=row['Номер счета плательщика'],
+                                receiver_name=row['Наименование/ФИО получателя'],
+                                receiver_bin=row['ИИН/БИН получателя'],
+                                receiver_residence=row['Резидентство получателя'],
+                                receiver_bank=row['Банк получателя'],
+                                receiver_account=row['Номер счета получателя'],
+                                payment_code=row['Код назначения платежа'],
+                                payment_description=row['Назначение платежа'])
+                except Exception as row_error:
+                    # Log or print the row error without stopping the entire process
+                    print(f"Error processing row {index}: {row_error}")
+
+        return {"status": "Data inserted for Kaspi"}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    finally:
+        driver.close()
+
 
 @router.post("/insert_data_halyk/")
 async def insert_data_halyk(file: UploadFile = File(...)):
@@ -86,6 +146,8 @@ async def insert_data_halyk(file: UploadFile = File(...)):
     contents = await file.read()
     excel_data = BytesIO(contents)  # Wrap the bytes in BytesIO
     df = pd.read_excel(excel_data, engine='openpyxl', skiprows=9)
+    if not check_columns(df.columns, expected_columns_halyk):
+        raise HTTPException(status_code=400, detail="Improper file format for Halyk.")
     try:
         with driver.session() as session:
             for index, row in df.iterrows():
@@ -141,70 +203,14 @@ async def insert_data_halyk(file: UploadFile = File(...)):
     finally:
         driver.close()
 
-@router.post("/insert_data_bck/")
-async def insert_data_bck(file: UploadFile = File(...)):
-    driver = create_neo4j_driver()
-    contents = await file.read()
-    df = pd.read_excel(contents, engine='openpyxl', skiprows=10)
-    df.dropna(how='all', inplace=True)
-
-    try:
-        with driver.session() as session:
-            for index, row in df.iterrows():
-                if isinstance(row['Корресп. Банк / Банк корресп.'], str):
-                    iinr = row['Корресп. Банк / Банк корресп.'][10:22]
-                if pd.notna(iinr) and pd.notna(row['ИИН/БИН контрагента']):
-                    iin1 = determine_type(iinr)
-                    iin2 = determine_type(row['ИИН/БИН контрагента'])
-                query = f"""
-                       Merge (p1:{iin1} {{iin: $iinr}})
-                       Merge (p2:{iin2} {{iin: $counterparty_bin}})
-                       MERGE (p1)-[t:TransactionCenterCredit]->(p2)
-                       ON CREATE SET t.`Күні / Дата` = $date,
-                                     t.`Счет` = $account,
-                                     t.`Дата открытия` = $open_date,
-                                     t.`Дата Закрытия` = $close_date,
-                                     t.`Құжат № /№ Документа` = $document_number,
-                                     t.`Валютасы /Валюта` = $currency,
-                                     t.`Корресп. Банк / Банк корресп.` = $correspondent_bank,
-                                     t.`Корресп. Есепшоты / Счет-корреспондент` = $correspondent_account,
-                                     t.`АЖК /БеК / КОд /Кбе` = $ajk_bek_code,
-                                     t.`ИИН/БИН контрагента` = $counterparty_bin,
-                                     t.`Контрагент. атауы / Наименование контрагента` = $counterparty_name,
-                                     t.`Дебет айналымы / Дебетовый оборот` = $debit_turnover,
-                                     t.`Кредит айналымы / Кредитовый оборот` = $credit_turnover,
-                                     t.`Төлем мақсаты / Назначение платежа` = $payment_purpose
-                       """
-
-                session.run(query,
-                            iinr=iinr,
-                            date=row['Күні / Дата'],
-                            account=row['Счет'],
-                            open_date=row['Дата открытия'],
-                            close_date=row['Дата Закрытия'],
-                            document_number=row['Құжат № /№ Документа'],
-                            currency=row['Валютасы /Валюта'],
-                            correspondent_bank=row['Корресп. Банк / Банк корресп.'],
-                            correspondent_account=row['Корресп. Есепшоты / Счет-корреспондент'],
-                            ajk_bek_code=row['АЖК /БеК / КОд /Кбе'],
-                            counterparty_bin=row['ИИН/БИН контрагента'],
-                            counterparty_name=row['Контрагент. атауы / Наименование контрагента'],
-                            debit_turnover=row['Дебет айналымы / Дебетовый оборот'],
-                            credit_turnover=row['Кредит айналымы / Кредитовый оборот'],
-                            payment_purpose=row['Төлем мақсаты / Назначение платежа'])
-
-            return {"status": "Data inserted for BCK"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        driver.close()
-
 @router.post("/insert_data_vtb/")
 async def insert_data_vtb(file: UploadFile = File(...)):
     driver = create_neo4j_driver()
     contents = await file.read()
     excel_data = BytesIO(contents)
     df = pd.read_excel(excel_data, engine='openpyxl')
+    if not check_columns(df.columns, expected_columns_vtb):
+        raise HTTPException(status_code=400, detail="Improper file format for VTB.")
     try:
         with driver.session() as session:
             for index, row in df.iterrows():
@@ -265,6 +271,8 @@ async def insert_data_home(file: UploadFile = File(...)):
     contents = await file.read()
     excel_data = BytesIO(contents)
     df = pd.read_excel(excel_data, engine='openpyxl')
+    if not check_columns(df.columns, expected_columns_home):
+        raise HTTPException(status_code=400, detail="Improper file format for Homebank.")
     try:
         with driver.session() as session:
             for index, row in df.iterrows():
@@ -363,6 +371,64 @@ async def insert_data_bereke(file: UploadFile = File(...)):
                             eknp_codes=row['Коды ЕКНП'])
 
             return {"status": "Data inserted for Bereke"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        driver.close()
+
+@router.post("/insert_data_bck/")
+async def insert_data_bck(file: UploadFile = File(...)):
+    driver = create_neo4j_driver()
+    contents = await file.read()
+    df = pd.read_excel(contents, engine='openpyxl', skiprows=10)
+    df.dropna(how='all', inplace=True)
+
+    try:
+        with driver.session() as session:
+            for index, row in df.iterrows():
+                if isinstance(row['Корресп. Банк / Банк корресп.'], str):
+                    iinr = row['Корресп. Банк / Банк корресп.'][10:22]
+                if pd.notna(iinr) and pd.notna(row['ИИН/БИН контрагента']):
+                    iin1 = determine_type(iinr)
+                    iin2 = determine_type(row['ИИН/БИН контрагента'])
+                query = f"""
+                       Merge (p1:{iin1} {{iin: $iinr}})
+                       Merge (p2:{iin2} {{iin: $counterparty_bin}})
+                       MERGE (p1)-[t:TransactionCenterCredit]->(p2)
+                       ON CREATE SET t.`Күні / Дата` = $date,
+                                     t.`Счет` = $account,
+                                     t.`Дата открытия` = $open_date,
+                                     t.`Дата Закрытия` = $close_date,
+                                     t.`Құжат № /№ Документа` = $document_number,
+                                     t.`Валютасы /Валюта` = $currency,
+                                     t.`Корресп. Банк / Банк корресп.` = $correspondent_bank,
+                                     t.`Корресп. Есепшоты / Счет-корреспондент` = $correspondent_account,
+                                     t.`АЖК /БеК / КОд /Кбе` = $ajk_bek_code,
+                                     t.`ИИН/БИН контрагента` = $counterparty_bin,
+                                     t.`Контрагент. атауы / Наименование контрагента` = $counterparty_name,
+                                     t.`Дебет айналымы / Дебетовый оборот` = $debit_turnover,
+                                     t.`Кредит айналымы / Кредитовый оборот` = $credit_turnover,
+                                     t.`Төлем мақсаты / Назначение платежа` = $payment_purpose
+                       """
+
+                session.run(query,
+                            iinr=iinr,
+                            date=row['Күні / Дата'],
+                            account=row['Счет'],
+                            open_date=row['Дата открытия'],
+                            close_date=row['Дата Закрытия'],
+                            document_number=row['Құжат № /№ Документа'],
+                            currency=row['Валютасы /Валюта'],
+                            correspondent_bank=row['Корресп. Банк / Банк корресп.'],
+                            correspondent_account=row['Корресп. Есепшоты / Счет-корреспондент'],
+                            ajk_bek_code=row['АЖК /БеК / КОд /Кбе'],
+                            counterparty_bin=row['ИИН/БИН контрагента'],
+                            counterparty_name=row['Контрагент. атауы / Наименование контрагента'],
+                            debit_turnover=row['Дебет айналымы / Дебетовый оборот'],
+                            credit_turnover=row['Кредит айналымы / Кредитовый оборот'],
+                            payment_purpose=row['Төлем мақсаты / Назначение платежа'])
+
+            return {"status": "Data inserted for BCK"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
