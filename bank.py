@@ -9,7 +9,7 @@ router = APIRouter()
 # Assuming you have a function to create the Neo4j driver
 def create_neo4j_driver():
     # Replace with actual connection details
-    uri = "bolt://192.168.122.104:7689/"
+    uri = "bolt://192.168.122.104:7687/"
     username = "neo4j"
     password = "afdpar"
     return GraphDatabase.driver(uri, auth=(username, password))
