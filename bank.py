@@ -78,7 +78,7 @@ async def insert_data_kaspi(file: UploadFile = File(...)):
 
     df = pd.read_excel(BytesIO(contents), engine='openpyxl', skiprows=10)
     if not check_columns(df.columns, expected_columns_kaspi):
-        raise HTTPException(status_code=400, detail="Improper file format for Kaspi.")
+        raise HTTPException(status_code=400, detail="Неправильный формат файла для Каспи.")
 
     df.dropna(how='all', inplace=True)
 
@@ -131,7 +131,7 @@ async def insert_data_kaspi(file: UploadFile = File(...)):
                     # Log or print the row error without stopping the entire process
                     print(f"Error processing row {index}: {row_error}")
 
-        return {"status": "Data inserted for Kaspi"}
+        return {"status": "Данные импортированы успешно!"}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -147,7 +147,7 @@ async def insert_data_halyk(file: UploadFile = File(...)):
     excel_data = BytesIO(contents)  # Wrap the bytes in BytesIO
     df = pd.read_excel(excel_data, engine='openpyxl', skiprows=9)
     if not check_columns(df.columns, expected_columns_halyk):
-        raise HTTPException(status_code=400, detail="Improper file format for Halyk.")
+        raise HTTPException(status_code=400, detail="Неправильный формат файла для Халык.")
     try:
         with driver.session() as session:
             for index, row in df.iterrows():
@@ -197,7 +197,7 @@ async def insert_data_halyk(file: UploadFile = File(...)):
                             receiver_account=row['Номер счета получателя'],
                             payment_code=row['Код назначения платежа'],
                             payment_description=row['Назначение платежа'])
-                return {"status": "Data inserted for Halyk"}
+                return {"status": "Данные импортированы успешно!"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
@@ -210,7 +210,7 @@ async def insert_data_vtb(file: UploadFile = File(...)):
     excel_data = BytesIO(contents)
     df = pd.read_excel(excel_data, engine='openpyxl')
     if not check_columns(df.columns, expected_columns_vtb):
-        raise HTTPException(status_code=400, detail="Improper file format for VTB.")
+        raise HTTPException(status_code=400, detail="Неправильный формат файла для ВТБ.")
     try:
         with driver.session() as session:
             for index, row in df.iterrows():
@@ -259,7 +259,7 @@ async def insert_data_vtb(file: UploadFile = File(...)):
                             payment_code=row['Код назначение платежа (КНП)'],
                             payment_description=row['Назначение платежа'])
 
-            return {"status": "Data inserted for VTB"}
+            return {"status": "Данные импортированы успешно!"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
@@ -272,7 +272,7 @@ async def insert_data_home(file: UploadFile = File(...)):
     excel_data = BytesIO(contents)
     df = pd.read_excel(excel_data, engine='openpyxl')
     if not check_columns(df.columns, expected_columns_home):
-        raise HTTPException(status_code=400, detail="Improper file format for Homebank.")
+        raise HTTPException(status_code=400, detail="Неправильный формат файла для HomeBank.")
     try:
         with driver.session() as session:
             for index, row in df.iterrows():
@@ -321,118 +321,118 @@ async def insert_data_home(file: UploadFile = File(...)):
                             payment_code=row['Код назначения платежа'],
                             payment_description=row['Назначение платежа'])
 
-            return {"status": "Data inserted for Home"}
+            return {"status": "Данные импортированы успешно!"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         driver.close()
-
-@router.post("/insert_data_bereke/")
-async def insert_data_bereke(file: UploadFile = File(...)):
-    driver = create_neo4j_driver()
-    contents = await file.read()
-    excel_data = BytesIO(contents)
-    df = pd.read_excel(excel_data, engine='openpyxl', skiprows=10, header=[0, 1])
-    try:
-        with driver.session() as session:
-            for index, row in df.iterrows():
-                iin = None
-                if isinstance(row['Корреспондент Счет, наименование БИН/ИИН'], str):
-                    iin = row['Корреспондент Счет, наименование БИН/ИИН'][21:33]
-
-                if isinstance(row['Назначение платежа'], str):
-                    iin_match = re.search(r'ИИН\s(\d{12})', row['Назначение платежа'])
-                if iin_match:
-                    print(iin, iin_match.group(1))
-
-                query = """
-                MERGE (p1:Person {iin: $iin})
-                MERGE (p1)-[t:TransactionBereke]-(p2:Bank {bic_name: '55554'})
-                ON CREATE SET t.`№ документа` = $doc_number,
-                              t.`Дата транзакции` = $transaction_date,
-                              t.`Время транзакции` = $transaction_time,
-                              t.`Корреспондент БИК наименование Банка` = $corr_bic_name,
-                              t.`Корреспондент Счет, наименование БИН/ИИН` = $corr_account_bin,
-                              t.`Обороты в валюте счета Дебет` = $debit_turnover,
-                              t.`Обороты в валюте счета Кредит` = $credit_turnover,
-                              t.`Назначение платежа` = $payment_description,
-                              t.`Коды ЕКНП` = $eknp_codes
-                """
-                session.run(query,
-                            iin=iin,
-                            doc_number=row['№ документа'],
-                            transaction_date=row['Дата транзакции'],
-                            transaction_time=row['Время транзакции'],
-                            corr_bic_name=row['Корреспондент БИК наименование Банка'],
-                            corr_account_bin=row['Корреспондент Счет, наименование БИН/ИИН'],
-                            debit_turnover=row['Обороты в валюте счета Дебет'],
-                            credit_turnover=row['Обороты в валюте счета Кредит'],
-                            payment_description=row['Назначение платежа'],
-                            eknp_codes=row['Коды ЕКНП'])
-
-            return {"status": "Data inserted for Bereke"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        driver.close()
-
-@router.post("/insert_data_bck/")
-async def insert_data_bck(file: UploadFile = File(...)):
-    driver = create_neo4j_driver()
-    contents = await file.read()
-    df = pd.read_excel(contents, engine='openpyxl', skiprows=10)
-    df.dropna(how='all', inplace=True)
-
-    try:
-        with driver.session() as session:
-            for index, row in df.iterrows():
-                if isinstance(row['Корресп. Банк / Банк корресп.'], str):
-                    iinr = row['Корресп. Банк / Банк корресп.'][10:22]
-                if pd.notna(iinr) and pd.notna(row['ИИН/БИН контрагента']):
-                    iin1 = determine_type(iinr)
-                    iin2 = determine_type(row['ИИН/БИН контрагента'])
-                query = f"""
-                       Merge (p1:{iin1} {{iin: $iinr}})
-                       Merge (p2:{iin2} {{iin: $counterparty_bin}})
-                       MERGE (p1)-[t:TransactionCenterCredit]->(p2)
-                       ON CREATE SET t.`Күні / Дата` = $date,
-                                     t.`Счет` = $account,
-                                     t.`Дата открытия` = $open_date,
-                                     t.`Дата Закрытия` = $close_date,
-                                     t.`Құжат № /№ Документа` = $document_number,
-                                     t.`Валютасы /Валюта` = $currency,
-                                     t.`Корресп. Банк / Банк корресп.` = $correspondent_bank,
-                                     t.`Корресп. Есепшоты / Счет-корреспондент` = $correspondent_account,
-                                     t.`АЖК /БеК / КОд /Кбе` = $ajk_bek_code,
-                                     t.`ИИН/БИН контрагента` = $counterparty_bin,
-                                     t.`Контрагент. атауы / Наименование контрагента` = $counterparty_name,
-                                     t.`Дебет айналымы / Дебетовый оборот` = $debit_turnover,
-                                     t.`Кредит айналымы / Кредитовый оборот` = $credit_turnover,
-                                     t.`Төлем мақсаты / Назначение платежа` = $payment_purpose
-                       """
-
-                session.run(query,
-                            iinr=iinr,
-                            date=row['Күні / Дата'],
-                            account=row['Счет'],
-                            open_date=row['Дата открытия'],
-                            close_date=row['Дата Закрытия'],
-                            document_number=row['Құжат № /№ Документа'],
-                            currency=row['Валютасы /Валюта'],
-                            correspondent_bank=row['Корресп. Банк / Банк корресп.'],
-                            correspondent_account=row['Корресп. Есепшоты / Счет-корреспондент'],
-                            ajk_bek_code=row['АЖК /БеК / КОд /Кбе'],
-                            counterparty_bin=row['ИИН/БИН контрагента'],
-                            counterparty_name=row['Контрагент. атауы / Наименование контрагента'],
-                            debit_turnover=row['Дебет айналымы / Дебетовый оборот'],
-                            credit_turnover=row['Кредит айналымы / Кредитовый оборот'],
-                            payment_purpose=row['Төлем мақсаты / Назначение платежа'])
-
-            return {"status": "Data inserted for BCK"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        driver.close()
+#
+# @router.post("/insert_data_bereke/")
+# async def insert_data_bereke(file: UploadFile = File(...)):
+#     driver = create_neo4j_driver()
+#     contents = await file.read()
+#     excel_data = BytesIO(contents)
+#     df = pd.read_excel(excel_data, engine='openpyxl', skiprows=10, header=[0, 1])
+#     try:
+#         with driver.session() as session:
+#             for index, row in df.iterrows():
+#                 iin = None
+#                 if isinstance(row['Корреспондент Счет, наименование БИН/ИИН'], str):
+#                     iin = row['Корреспондент Счет, наименование БИН/ИИН'][21:33]
+#
+#                 if isinstance(row['Назначение платежа'], str):
+#                     iin_match = re.search(r'ИИН\s(\d{12})', row['Назначение платежа'])
+#                 if iin_match:
+#                     print(iin, iin_match.group(1))
+#
+#                 query = """
+#                 MERGE (p1:Person {iin: $iin})
+#                 MERGE (p1)-[t:TransactionBereke]-(p2:Bank {bic_name: '55554'})
+#                 ON CREATE SET t.`№ документа` = $doc_number,
+#                               t.`Дата транзакции` = $transaction_date,
+#                               t.`Время транзакции` = $transaction_time,
+#                               t.`Корреспондент БИК наименование Банка` = $corr_bic_name,
+#                               t.`Корреспондент Счет, наименование БИН/ИИН` = $corr_account_bin,
+#                               t.`Обороты в валюте счета Дебет` = $debit_turnover,
+#                               t.`Обороты в валюте счета Кредит` = $credit_turnover,
+#                               t.`Назначение платежа` = $payment_description,
+#                               t.`Коды ЕКНП` = $eknp_codes
+#                 """
+#                 session.run(query,
+#                             iin=iin,
+#                             doc_number=row['№ документа'],
+#                             transaction_date=row['Дата транзакции'],
+#                             transaction_time=row['Время транзакции'],
+#                             corr_bic_name=row['Корреспондент БИК наименование Банка'],
+#                             corr_account_bin=row['Корреспондент Счет, наименование БИН/ИИН'],
+#                             debit_turnover=row['Обороты в валюте счета Дебет'],
+#                             credit_turnover=row['Обороты в валюте счета Кредит'],
+#                             payment_description=row['Назначение платежа'],
+#                             eknp_codes=row['Коды ЕКНП'])
+#
+#             return {"status": "Data inserted for Bereke"}
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
+#     finally:
+#         driver.close()
+#
+# @router.post("/insert_data_bck/")
+# async def insert_data_bck(file: UploadFile = File(...)):
+#     driver = create_neo4j_driver()
+#     contents = await file.read()
+#     df = pd.read_excel(contents, engine='openpyxl', skiprows=10)
+#     df.dropna(how='all', inplace=True)
+#
+#     try:
+#         with driver.session() as session:
+#             for index, row in df.iterrows():
+#                 if isinstance(row['Корресп. Банк / Банк корресп.'], str):
+#                     iinr = row['Корресп. Банк / Банк корресп.'][10:22]
+#                 if pd.notna(iinr) and pd.notna(row['ИИН/БИН контрагента']):
+#                     iin1 = determine_type(iinr)
+#                     iin2 = determine_type(row['ИИН/БИН контрагента'])
+#                 query = f"""
+#                        Merge (p1:{iin1} {{iin: $iinr}})
+#                        Merge (p2:{iin2} {{iin: $counterparty_bin}})
+#                        MERGE (p1)-[t:TransactionCenterCredit]->(p2)
+#                        ON CREATE SET t.`Күні / Дата` = $date,
+#                                      t.`Счет` = $account,
+#                                      t.`Дата открытия` = $open_date,
+#                                      t.`Дата Закрытия` = $close_date,
+#                                      t.`Құжат № /№ Документа` = $document_number,
+#                                      t.`Валютасы /Валюта` = $currency,
+#                                      t.`Корресп. Банк / Банк корресп.` = $correspondent_bank,
+#                                      t.`Корресп. Есепшоты / Счет-корреспондент` = $correspondent_account,
+#                                      t.`АЖК /БеК / КОд /Кбе` = $ajk_bek_code,
+#                                      t.`ИИН/БИН контрагента` = $counterparty_bin,
+#                                      t.`Контрагент. атауы / Наименование контрагента` = $counterparty_name,
+#                                      t.`Дебет айналымы / Дебетовый оборот` = $debit_turnover,
+#                                      t.`Кредит айналымы / Кредитовый оборот` = $credit_turnover,
+#                                      t.`Төлем мақсаты / Назначение платежа` = $payment_purpose
+#                        """
+#
+#                 session.run(query,
+#                             iinr=iinr,
+#                             date=row['Күні / Дата'],
+#                             account=row['Счет'],
+#                             open_date=row['Дата открытия'],
+#                             close_date=row['Дата Закрытия'],
+#                             document_number=row['Құжат № /№ Документа'],
+#                             currency=row['Валютасы /Валюта'],
+#                             correspondent_bank=row['Корресп. Банк / Банк корресп.'],
+#                             correspondent_account=row['Корресп. Есепшоты / Счет-корреспондент'],
+#                             ajk_bek_code=row['АЖК /БеК / КОд /Кбе'],
+#                             counterparty_bin=row['ИИН/БИН контрагента'],
+#                             counterparty_name=row['Контрагент. атауы / Наименование контрагента'],
+#                             debit_turnover=row['Дебет айналымы / Дебетовый оборот'],
+#                             credit_turnover=row['Кредит айналымы / Кредитовый оборот'],
+#                             payment_purpose=row['Төлем мақсаты / Назначение платежа'])
+#
+#             return {"status": "Data inserted for BCK"}
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
+#     finally:
+#         driver.close()
 
 # @app.post("/insert_data_euroasia/")
 # async def insert_data_euroasia(df: pd.DataFrame):
