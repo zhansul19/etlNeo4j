@@ -8,10 +8,12 @@ router = APIRouter()
 
 # Assuming you have a function to create the Neo4j driver
 def create_neo4j_driver():
-    # Replace with actual connection details
     uri = "bolt://192.168.122.104:7687"
     username = "neo4j"
     password = "afmdpar"
+    # uri = "bolt://localhost:7689"
+    # username = "neo4j"
+    # password = "password"
     return GraphDatabase.driver(uri, auth=(username, password))
 
 # Assuming pandas DataFrame is passed as a file upload in FastAPI
@@ -53,22 +55,12 @@ def determine_type(iin):
     iin_str = str(iin)
     if len(iin_str)>5:
         if iin_str[4] in {'0', '1', '2', '3'}:
-            return "PersonBank"
-        elif iin_str[4] in {'4', '5', '6'}:
-            return "CompanyBank"
+            return "Person"
+        elif iin_str[4] in {'4', '5', '6', '7', '8', '9'}:
+            return "Company"
     else:
         return "rrrBank"
-# def check_columns_in_excel(file_path):
-#     df = pd.read_excel(file_path, engine='openpyxl', skiprows=10)
-#     first_row_columns = df.columns.tolist()
-#
-#     if all(column in first_row_columns for column in expected_columns):
-#         return True
-#     else:
-#         missing_columns = [col for col in expected_columns if col not in first_row_columns]
-#         print(f"Missing columns: {missing_columns}")
-#         return False
-# Helper function to check columns in Excel
+
 def check_columns(df_columns, expected_columns):
     return all(column in df_columns for column in expected_columns)
 @router.post("/insert_data_kaspi/")
@@ -131,7 +123,7 @@ async def insert_data_kaspi(file: UploadFile = File(...)):
                     # Log or print the row error without stopping the entire process
                     print(f"Error processing row {index}: {row_error}")
 
-        return {"status": "Данные импортированы успешно!"}
+            return {"status": "Данные импортированы успешно!"}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -197,7 +189,7 @@ async def insert_data_halyk(file: UploadFile = File(...)):
                             receiver_account=row['Номер счета получателя'],
                             payment_code=row['Код назначения платежа'],
                             payment_description=row['Назначение платежа'])
-                return {"status": "Данные импортированы успешно!"}
+            return {"status": "Данные импортированы успешно!"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
