@@ -60,6 +60,11 @@ def determine_type(iin):
             return "Company"
     else:
         return "rrrBank"
+def determine_iin(name):
+    if name == 'Company':
+        return "БИН"
+    elif name == 'Person':
+        return "ИИН"
 
 def check_columns(df_columns, expected_columns):
     return all(column in df_columns for column in expected_columns)
@@ -81,9 +86,12 @@ async def insert_data_kaspi(file: UploadFile = File(...)):
                     iin1 = determine_type(row['ИИН/БИН плательщика'])
                     iin2 = determine_type(row['ИИН/БИН получателя'])
 
+                    property1 = determine_iin(iin1)
+                    property2 = determine_iin(iin2)
+
                     query = f"""
-                       MERGE (p1:{iin1} {{iin: $sender_bin}})
-                       MERGE (p2:{iin2} {{iin: $receiver_bin}})
+                       MERGE (p1:{iin1} {{{property1}: $sender_bin}})
+                       MERGE (p2:{iin2} {{{property2}: $receiver_bin}})
                        MERGE (p1)-[t:TransactionKaspi]-(p2)
                        ON CREATE SET t.`Дата и время операции` = $date_time,
                                      t.`Валюта операции` = $currency,
@@ -145,9 +153,13 @@ async def insert_data_halyk(file: UploadFile = File(...)):
             for index, row in df.iterrows():
                 iin1 = determine_type(row['ИИН/БИН плательщика'])
                 iin2 = determine_type(row['ИИН/БИН получателя'])
+
+                property1 = determine_iin(iin1)
+                property2 = determine_iin(iin2)
+
                 query = f"""
-                MERGE (p1: {iin1} {{iin: $sender_bin}})
-                MERGE (p2: {iin2} {{iin: $receiver_bin}})
+                MERGE (p1: {iin1} {{{property1}: $sender_bin}})
+                MERGE (p2: {iin2} {{{property2}: $receiver_bin}})
                 MERGE (p1)-[t:TransactionHalyk]-(p2)
                 ON CREATE SET t.`Дата и время операции` = $date_time,
                               t.`Валюта операции` = $currency,
@@ -208,9 +220,13 @@ async def insert_data_vtb(file: UploadFile = File(...)):
             for index, row in df.iterrows():
                 iin1 = determine_type(row['ИИН/БИН плательщика'])
                 iin2 = determine_type(row['ИИН/БИН получателя'])
+
+                property1 = determine_iin(iin1)
+                property2 = determine_iin(iin2)
+
                 query = f"""
-                MERGE (p1:{iin1} {{iin: $sender_bin}})
-                MERGE (p2:{iin2} {{iin: $receiver_bin}})
+                MERGE (p1:{iin1} {{{property1}: $sender_bin}})
+                MERGE (p2:{iin2} {{{property2}: $receiver_bin}})
                 MERGE (p1)-[t:TransactionVtb]-(p2)
                 ON CREATE SET t.`Дата и время операции` = $date_time,
                               t.`Валюта операции` = $currency,
@@ -270,9 +286,13 @@ async def insert_data_home(file: UploadFile = File(...)):
             for index, row in df.iterrows():
                 iin1 = determine_type(row['ИИН/БИН плательщика'])
                 iin2 = determine_type(row['ИИН/БИН получателя'])
+
+                property1 = determine_iin(iin1)
+                property2 = determine_iin(iin2)
+
                 query = f"""
-                merge (p1:{iin1} {{iin: $sender_bin}})
-                merge (p2:{iin2} {{iin: $receiver_bin}})
+                merge (p1:{iin1} {{{property1}: $sender_bin}})
+                merge (p2:{iin2} {{{property2}: $receiver_bin}})
                 MERGE (p1)-[t:TransactionHome]-(p2)
                 ON CREATE SET t.`Дата и время операции` = $date_time,
                               t.`Валюта операции` = $currency,
