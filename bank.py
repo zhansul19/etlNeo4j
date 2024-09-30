@@ -2,7 +2,6 @@ from fastapi import APIRouter, HTTPException, File, UploadFile
 import pandas as pd
 from neo4j import GraphDatabase
 from io import BytesIO
-import re
 
 router = APIRouter()
 
@@ -51,6 +50,7 @@ expected_columns_vtb = [
     'Номер счета получателя', 'Код назначение платежа (КНП)', 'Назначение платежа'
 ]
 
+
 def determine_type(iin):
     iin_str = str(iin)
     if len(iin_str)>5:
@@ -60,14 +60,20 @@ def determine_type(iin):
             return "Company"
     else:
         return "rrrBank"
-def determine_iin(name):
-    if name == 'Company':
-        return "БИН"
-    elif name == 'Person':
-        return "ИИН"
+
+
+def determine_iin(entity_type):
+    if entity_type == 'Person':
+        return 'ИИН'
+    elif entity_type == 'Company':
+        return 'БИН'
+    return None
+
 
 def check_columns(df_columns, expected_columns):
     return all(column in df_columns for column in expected_columns)
+
+
 @router.post("/insert_data_kaspi/")
 async def insert_data_kaspi(file: UploadFile = File(...)):
     contents = await file.read()
@@ -88,47 +94,32 @@ async def insert_data_kaspi(file: UploadFile = File(...)):
 
                     property1 = determine_iin(iin1)
                     property2 = determine_iin(iin2)
-
+                    if property1 is None or property2 is None:
+                        raise ValueError(f"Invalid IIN/BIN types for row {index}")
                     query = f"""
-                       MERGE (p1:{iin1} {{{property1}: $sender_bin}})
-                       MERGE (p2:{iin2} {{{property2}: $receiver_bin}})
-                       MERGE (p1)-[t:TransactionKaspi]-(p2)
-                       ON CREATE SET t.`Дата и время операции` = $date_time,
-                                     t.`Валюта операции` = $currency,
-                                     t.`Виды операции (категория документа)` = $operation_type,
-                                     t.`Сумма` = $amount,
-                                     t.`Наименование/ФИО плательщика` = $sender_name,
-                                     t.`ИИН/БИН плательщика` = $sender_bin,
-                                     t.`Резидентство плательщика` = $sender_residence,
-                                     t.`Банк плательщика` = $sender_bank,
-                                     t.`Номер счета плательщика` = $sender_account,
-                                     t.`Наименование/ФИО получателя` = $receiver_name,
-                                     t.`ИИН/БИН получателя` = $receiver_bin,
-                                     t.`Резидентство получателя` = $receiver_residence,
-                                     t.`Банк получателя` = $receiver_bank,
-                                     t.`Номер счета получателя` = $receiver_account,
-                                     t.`Код назначения платежа` = $payment_code,
-                                     t.`Назначение платежа` = $payment_description
-                       """
-                    session.run(query,
-                                date_time=row['Дата и время операции'],
-                                currency=row['Валюта операции'],
-                                operation_type=row['Виды операции (категория документа)'],
-                                amount=row['Сумма'],
-                                sender_name=row['Наименование/ФИО плательщика'],
-                                sender_bin=row['ИИН/БИН плательщика'],
-                                sender_residence=row['Резидентство плательщика'],
-                                sender_bank=row['Банк плательщика'],
-                                sender_account=row['Номер счета плательщика'],
-                                receiver_name=row['Наименование/ФИО получателя'],
-                                receiver_bin=row['ИИН/БИН получателя'],
-                                receiver_residence=row['Резидентство получателя'],
-                                receiver_bank=row['Банк получателя'],
-                                receiver_account=row['Номер счета получателя'],
-                                payment_code=row['Код назначения платежа'],
-                                payment_description=row['Назначение платежа'])
+                        MERGE (p1:{iin1} {{{property1}: '{str(row['ИИН/БИН плательщика'])}'}})
+                        MERGE (p2:{iin2} {{{property2}: '{str(row['ИИН/БИН получателя'])}'}})
+                        MERGE (p1)-[t:TransactionKaspi]-(p2)
+                        ON CREATE SET t.`Дата и время операции` = '{str(row['Дата и время операции'])}',
+                                      t.`Валюта операции` = '{str(row['Валюта операции'])}',
+                                      t.`Виды операции (категория документа)` = '{str(row['Виды операции (категория документа)'])}',
+                                      t.`Сумма` = '{(row['Сумма'])}',
+                                      t.`Наименование/ФИО плательщика` = '{str(row['Наименование/ФИО плательщика'])}',
+                                      t.`ИИН/БИН плательщика` = '{str(row['ИИН/БИН плательщика'])}',
+                                      t.`Резидентство плательщика` = '{str(row['Резидентство плательщика'])}',
+                                      t.`Банк плательщика` = '{str(row['Банк плательщика'])}',
+                                      t.`Номер счета плательщика` = '{str(row['Номер счета плательщика'])}',
+                                      t.`Наименование/ФИО получателя` = '{str(row['Наименование/ФИО получателя'])}',
+                                      t.`ИИН/БИН получателя` = '{str(row['ИИН/БИН получателя'])}',
+                                      t.`Резидентство получателя` = '{str(row['Резидентство получателя'])}',
+                                      t.`Банк получателя` = '{str(row['Банк получателя'])}',
+                                      t.`Номер счета получателя` = '{str(row['Номер счета получателя'])}',
+                                      t.`Код назначения платежа` = '{str(row['Код назначения платежа'])}',
+                                      t.`Назначение платежа` = '{str(row['Назначение платежа'])}'
+                        """
+
+                    session.run(query)
                 except Exception as row_error:
-                    # Log or print the row error without stopping the entire process
                     print(f"Error processing row {index}: {row_error}")
 
             return {"status": "Данные импортированы успешно!"}
@@ -158,49 +149,30 @@ async def insert_data_halyk(file: UploadFile = File(...)):
                 property2 = determine_iin(iin2)
 
                 query = f"""
-                MERGE (p1: {iin1} {{{property1}: $sender_bin}})
-                MERGE (p2: {iin2} {{{property2}: $receiver_bin}})
-                MERGE (p1)-[t:TransactionHalyk]-(p2)
-                ON CREATE SET t.`Дата и время операции` = $date_time,
-                              t.`Валюта операции` = $currency,
-                              t.`Виды операции (категория документа)` = $operation_type,
-                              t.`Наименование СДП (при наличии)` = $sdp_name,
-                              t.`Сумма в валюте ее проведения по кредиту` = $credit_amount,
-                              t.`Сумма в валюте ее проведения по дебету` = $debit_amount,
-                              t.`Сумма в тенге` = $amount_in_tenge,
-                              t.`Наименование/ФИО плательщика` = $sender_name,
-                              t.`ИИН/БИН плательщика` = $sender_bin,
-                              t.`Резидентство плательщика` = $sender_residence,
-                              t.`Банк плательщика` = $sender_bank,
-                              t.`Номер счета плательщика` = $sender_account,
-                              t.`Наименование/ФИО получателя` = $receiver_name,
-                              t.`ИИН/БИН получателя` = $receiver_bin,
-                              t.`Резидентство получателя` = $receiver_residence,
-                              t.`Банк получателя` = $receiver_bank,
-                              t.`Номер счета получателя` = $receiver_account,
-                              t.`Код назначения платежа` = $payment_code,
-                              t.`Назначение платежа` = $payment_description
+                    MERGE (p1: {iin1} {{{property1}: '{row['ИИН/БИН плательщика']}'}})
+                    MERGE (p2: {iin2} {{{property2}: '{row['ИИН/БИН получателя']}'}})
+                    MERGE (p1)-[t:TransactionHalyk]-(p2)
+                    ON CREATE SET t.`Дата и время операции` = '{row['Дата и время операции']}',
+                                  t.`Валюта операции` = '{row['Валюта операции']}',
+                                  t.`Виды операции (категория документа)` = '{row['Виды операции (категория документа)']}',
+                                  t.`Наименование СДП (при наличии)` = '{row.get('Наименование СДП (при наличии)', '')}',
+                                  t.`Сумма в валюте ее проведения по кредиту` = '{row.get('Сумма в валюте ее проведения по кредиту', '')}',
+                                  t.`Сумма в валюте ее проведения по дебету` = '{row.get('Сумма в валюте ее проведения по дебету', '')}',
+                                  t.`Сумма в тенге` = '{row.get('Сумма в тенге', '')}',
+                                  t.`Наименование/ФИО плательщика` = '{row['Наименование/ФИО плательщика']}',
+                                  t.`ИИН/БИН плательщика` = '{row['ИИН/БИН плательщика']}',
+                                  t.`Резидентство плательщика` = '{row['Резидентство плательщика']}',
+                                  t.`Банк плательщика` = '{row['Банк плательщика']}',
+                                  t.`Номер счета плательщика` = '{row['Номер счета плательщика']}',
+                                  t.`Наименование/ФИО получателя` = '{row['Наименование/ФИО получателя']}',
+                                  t.`ИИН/БИН получателя` = '{row['ИИН/БИН получателя']}',
+                                  t.`Резидентство получателя` = '{row['Резидентство получателя']}',
+                                  t.`Банк получателя` = '{row['Банк получателя']}',
+                                  t.`Номер счета получателя` = '{row['Номер счета получателя']}',
+                                  t.`Код назначения платежа` = '{row['Код назначения платежа']}',
+                                  t.`Назначение платежа` = '{row['Назначение платежа']}'
                 """
-                session.run(query,
-                            date_time=row['Дата и время операции'],
-                            currency=row['Валюта операции'],
-                            operation_type=row['Виды операции (категория документа)'],
-                            sdp_name=row.get('Наименование СДП (при наличии)', None),
-                            credit_amount=row.get('Сумма в валюте ее проведения по кредиту', None),
-                            debit_amount=row.get('Сумма в валюте ее проведения по дебету', None),
-                            amount_in_tenge=row.get('Сумма в тенге', None),
-                            sender_name=row['Наименование/ФИО плательщика'],
-                            sender_bin=row['ИИН/БИН плательщика'],
-                            sender_residence=row['Резидентство плательщика'],
-                            sender_bank=row['Банк плательщика'],
-                            sender_account=row['Номер счета плательщика'],
-                            receiver_name=row['Наименование/ФИО получателя'],
-                            receiver_bin=row['ИИН/БИН получателя'],
-                            receiver_residence=row['Резидентство получателя'],
-                            receiver_bank=row['Банк получателя'],
-                            receiver_account=row['Номер счета получателя'],
-                            payment_code=row['Код назначения платежа'],
-                            payment_description=row['Назначение платежа'])
+                session.run(query)
             return {"status": "Данные импортированы успешно!"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -225,47 +197,30 @@ async def insert_data_vtb(file: UploadFile = File(...)):
                 property2 = determine_iin(iin2)
 
                 query = f"""
-                MERGE (p1:{iin1} {{{property1}: $sender_bin}})
-                MERGE (p2:{iin2} {{{property2}: $receiver_bin}})
+                MERGE (p1:{iin1} {{{property1}:'{row['ИИН/БИН плательщика']}'}})
+                MERGE (p2:{iin2} {{{property2}: '{row['ИИН/БИН получателя']}'}})
                 MERGE (p1)-[t:TransactionVtb]-(p2)
-                ON CREATE SET t.`Дата и время операции` = $date_time,
-                              t.`Валюта операции` = $currency,
-                              t.`Вид операции (КД)` = $operation_type,
-                              t.`Наименование СДП (при наличии)` = $sdp_name,
-                              t.`Сумма (вал.)` = $amount_currency,
-                              t.`Сумма (тенге)` = $amount_tenge,
-                              t.`Наименование/ФИО плательщика` = $sender_name,
-                              t.`ИИН/БИН плательщика` = $sender_bin,
-                              t.`Резиденство плательщика` = $sender_residence,
-                              t.`Банк плательщика` = $sender_bank,
-                              t.`Номер счета плательщика` = $sender_account,
-                              t.`Наименование/ФИО получателя` = $receiver_name,
-                              t.`ИИН/БИН получателя` = $receiver_bin,
-                              t.`Резиденство получателя` = $receiver_residence,
-                              t.`Банк получателя` = $receiver_bank,
-                              t.`Номер счета получателя` = $receiver_account,
-                              t.`Код назначение платежа (КНП)` = $payment_code,
-                              t.`Назначение платежа` = $payment_description
-                """
-                session.run(query,
-                            date_time=row['Дата и время операции'],
-                            currency=row['Валюта операции'],
-                            operation_type=row['Вид операции (КД)'],
-                            sdp_name=row.get('Наименование СДП (при наличии)', None),
-                            amount_currency=row['Сумма (вал.)'],
-                            amount_tenge=row['Сумма (тенге)'],
-                            sender_name=row['Наименование/ФИО плательщика'],
-                            sender_bin=row['ИИН/БИН плательщика'],
-                            sender_residence=row['Резиденство плательщика'],
-                            sender_bank=row['Банк плательщика'],
-                            sender_account=row['Номер счета плательщика'],
-                            receiver_name=row['Наименование/ФИО получателя'],
-                            receiver_bin=row['ИИН/БИН получателя'],
-                            receiver_residence=row['Резиденство получателя'],
-                            receiver_bank=row['Банк получателя'],
-                            receiver_account=row['Номер счета получателя'],
-                            payment_code=row['Код назначение платежа (КНП)'],
-                            payment_description=row['Назначение платежа'])
+                ON CREATE SET t.Дата и время операции = '{row['Дата и время операции']}',
+                              t.Валюта операции = '{row['Валюта операции']}',
+                              t.Вид операции (КД) = '{row['Вид операции (КД)']}',
+                              t.Наименование СДП (при наличии) = '{row.get('Наименование СДП (при наличии)', '')}',
+                              t.Сумма (вал.) = '{row['Сумма (вал.)']}',
+                              t.Сумма (тенге) = '{row['Сумма (тенге)']}',
+                              t.Наименование/ФИО плательщика = '{row['Наименование/ФИО плательщика']}',
+                              t.ИИН/БИН плательщика = '{row['ИИН/БИН плательщика']}',
+                              t.Резиденство плательщика = '{row['Резиденство плательщика']}',
+                              t.Банк плательщика = '{row['Банк плательщика']}',
+                              t.Номер счета плательщика = '{row['Номер счета плательщика']}',
+                              t.Наименование/ФИО получателя = '{row['Наименование/ФИО получателя']}',
+                              t.ИИН/БИН получателя = '{row['ИИН/БИН получателя']}',
+                              t.Резиденство получателя = '{row['Резиденство получателя']}',
+                              t.Банк получателя = '{row['Банк получателя']}',
+                              t.Номер счета получателя = '{row['Номер счета получателя']}',
+                              t.Код назначение платежа (КНП) = '{row['Код назначение платежа (КНП)']}',
+                              t.Назначение платежа = '{row['Назначение платежа']}'
+            """
+
+                session.run(query)
 
             return {"status": "Данные импортированы успешно!"}
     except Exception as e:
@@ -286,52 +241,34 @@ async def insert_data_home(file: UploadFile = File(...)):
             for index, row in df.iterrows():
                 iin1 = determine_type(row['ИИН/БИН плательщика'])
                 iin2 = determine_type(row['ИИН/БИН получателя'])
-
                 property1 = determine_iin(iin1)
                 property2 = determine_iin(iin2)
 
                 query = f"""
-                merge (p1:{iin1} {{{property1}: $sender_bin}})
-                merge (p2:{iin2} {{{property2}: $receiver_bin}})
-                MERGE (p1)-[t:TransactionHome]-(p2)
-                ON CREATE SET t.`Дата и время операции` = $date_time,
-                              t.`Валюта операции` = $currency,
-                              t.`Виды операции (категория документа)` = $operation_type,
-                              t.`Наименование СДП (при наличии)` = $sdp_name,
-                              t.`Сумма в валюте ее проведения` = $amount_currency,
-                              t.`Сумма в тенге` = $amount_tenge,
-                              t.`Наименование/ФИО плательщика` = $sender_name,
-                              t.`ИИН/БИН плательщика` = $sender_bin,
-                              t.`Резидентство плательщика` = $sender_residence,
-                              t.`Банк плательщика` = $sender_bank,
-                              t.`Номер счета плательщика` = $sender_account,
-                              t.`Наименование/ФИО получателя` = $receiver_name,
-                              t.`ИИН/БИН получателя` = $receiver_bin,
-                              t.`Резидентство получателя` = $receiver_residence,
-                              t.`Банк получателя` = $receiver_bank,
-                              t.`Номер счета получателя` = $receiver_account,
-                              t.`Код назначения платежа` = $payment_code,
-                              t.`Назначение платежа` = $payment_description
+                    MERGE (p1:{iin1} {{{property1}: '{row['ИИН/БИН плательщика']}'}})
+                    MERGE (p2:{iin2} {{{property2}: '{row['ИИН/БИН получателя']}'}})
+                    MERGE (p1)-[t:TransactionHome]-(p2)
+                    ON CREATE SET t.`Дата и время операции` = '{row['Дата и время операции']}',
+                                  t.`Валюта операции` = '{row['Валюта операции']}',
+                                  t.`Виды операции (категория документа)` = '{row['Виды операции (категория документа)']}',
+                                  t.`Наименование СДП (при наличии)` = '{row.get('Наименование СДП (при наличии)', '')}',
+                                  t.`Сумма в валюте ее проведения` = '{row['Сумма в валюте ее проведения']}',
+                                  t.`Сумма в тенге` = '{row['Сумма в тенге']}',
+                                  t.`Наименование/ФИО плательщика` = '{row['Наименование/ФИО плательщика']}',
+                                  t.`ИИН/БИН плательщика` = '{row['ИИН/БИН плательщика']}',
+                                  t.`Резидентство плательщика` = '{row['Резидентство плательщика']}',
+                                  t.`Банк плательщика` = '{row['Банк плательщика']}',
+                                  t.`Номер счета плательщика` = '{row['Номер счета плательщика']}',
+                                  t.`Наименование/ФИО получателя` = '{row['Наименование/ФИО получателя']}',
+                                  t.`ИИН/БИН получателя` = '{row['ИИН/БИН получателя']}',
+                                  t.`Резидентство получателя` = '{row['Резидентство получателя']}',
+                                  t.`Банк получателя` = '{row['Банк получателя']}',
+                                  t.`Номер счета получателя` = '{row['Номер счета получателя']}',
+                                  t.`Код назначения платежа` = '{row['Код назначения платежа']}',
+                                  t.`Назначение платежа` = '{row['Назначение платежа']}'
                 """
-                session.run(query,
-                            date_time=row['Дата и время операции'],
-                            currency=row['Валюта операции'],
-                            operation_type=row['Виды операции (категория документа)'],
-                            sdp_name=row.get('Наименование СДП (при наличии)', None),
-                            amount_currency=row['Сумма в валюте ее проведения'],
-                            amount_tenge=row['Сумма в тенге'],
-                            sender_name=row['Наименование/ФИО плательщика'],
-                            sender_bin=row['ИИН/БИН плательщика'],
-                            sender_residence=row['Резидентство плательщика'],
-                            sender_bank=row['Банк плательщика'],
-                            sender_account=row['Номер счета плательщика'],
-                            receiver_name=row['Наименование/ФИО получателя'],
-                            receiver_bin=row['ИИН/БИН получателя'],
-                            receiver_residence=row['Резидентство получателя'],
-                            receiver_bank=row['Банк получателя'],
-                            receiver_account=row['Номер счета получателя'],
-                            payment_code=row['Код назначения платежа'],
-                            payment_description=row['Назначение платежа'])
+                print(query)
+                session.run(query)
 
             return {"status": "Данные импортированы успешно!"}
     except Exception as e:
